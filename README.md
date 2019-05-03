@@ -13,20 +13,24 @@ The baseline by setting all point as (-1) is around 30%.
 We look into the density plots into details to ensure the cut-off points for the most three important features, NDAI, SD and CORR.
 
 ## Modeling
-We used five models to classify the data and examine them through cross validation and confusion matrix
-### K-Nearest Neightbour (KNN) method
+We used five models to classify the data for different classification models and examine them through cross validation and confusion matrices. Our five classification models are:
 
-### Logistic Regression
+1. K-Nearest Neightbour (KNN) method
 
-### Linear Discriminant Analysis
+2. Logistic Regression
 
-### Quadratic Discriminant Analysis
+3. Linear Discriminant Analysis (LDA)
 
-### Random Forest
+4. Quadratic Discriminant Analysis (QDA)
+
+5. Random Forest
 
 ### Other Methods to Evaluate the Classification Models
-#### Receiver Operating Characteristic
+We also include other methods to report the performance of our model and they are:
 
-#### Area Under the Curve
+1. Receiver Operating Characteristic (ROC)
+ 
+2. Area Under the Curve (AUC)
 
 ## Diagnosis
+We run our diagnosis on our best performance model, KNN. This migth be becasue of its property of not assuming any distribution of independence of the data.
