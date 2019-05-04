@@ -1,0 +1,797 @@
+---
+title: "STAT 154 - Project 2"
+author: "Huang liang, Wei Mian"
+date: "4/21/2019"
+output:
+  html_document:
+    df_print: paged
+---
+# Data Collection and Exploration
+
+## Part a
+Importing data:
+```{r}
+setwd("~/Desktop/STAT 154 Modern Statistical Prediction and Machine Learning/project2/image_data/")
+file1 = read.table("image1.txt")
+file2 = read.table("image2.txt")
+file3 = read.table("image3.txt")
+colnames(file1) = c("y", "x", "exlabel", "NDAI", "SD", "CORR", "DF", "CF", "BF", "AF", "AN")
+colnames(file2) = c("y", "x", "exlabel", "NDAI", "SD", "CORR", "DF", "CF", "BF", "AF", "AN")
+colnames(file3) = c("y", "x", "exlabel", "NDAI", "SD", "CORR", "DF", "CF", "BF", "AF", "AN")
+full_data = rbind(file1, file2, file3)
+```
+## Part b
+Summarise the data
+```{r}
+portion1 <- table(file1$exlabel)/nrow(file1)
+portion2 <- table(file2$exlabel)/nrow(file2)
+portion3 <- table(file3$exlabel)/nrow(file3)
+portion1
+portion2
+portion3
+```
+Plot the groups
+```{r, fig.width = 10, fig.height = 10}
+library(ggplot2)
+ggplot(data = file1, aes(x, y, color = as.character(exlabel))) +
+  geom_point() +
+  labs(x="x coordinate", y="y coordinate", colour="Expert Label", caption="Image 1") + 
+  scale_color_brewer(palette = "Pastel2") +
+  theme(legend.position="top") 
+ggplot(data = file2, aes(x, y, color = as.character(exlabel))) +
+  geom_point() +
+  labs(x="x coordinate", y="y coordinate", colour="Expert Label", caption="Image 2") +
+  scale_color_brewer(palette = "Pastel2") +
+  theme(legend.position="top")
+ggplot(data = file3, aes(x, y, color = as.character(exlabel))) +
+  geom_point() +
+  labs(x="x coordinate", y="y coordinate", colour="Expert Label", caption="Image 3") +
+  scale_color_brewer(palette = "Pastel2") +
+  theme(legend.position="top")
+
+```
+
+## Part c
+
+### Pairwise scatterplot including density plots.
+```{r}
+library(GGally)
+ggpairs(file1[, 3:11], aes(colour = as.character(exlabel), alpha = 0.4))
+ggpairs(file2[, 3:11], aes(colour = as.character(exlabel), alpha = 0.4))
+ggpairs(file3[, 3:11], aes(colour = as.character(exlabel), alpha = 0.4))
+```
+
+### Density plots into details
+By limiting the range on the x-axis, we could look the tips into detail.
+```{r}
+ggplot(aes(x=NDAI, color=as.character(exlabel)), data=file1) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image1") +
+  theme(legend.position="top") 
+ggplot(aes(x=SD, color=as.character(exlabel)), data=file1) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image1") + xlim(0, 10)+
+  theme(legend.position="top") 
+ggplot(aes(x=CORR, color=as.character(exlabel)), data=file1) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image1") + xlim(0, 0.3)+
+  theme(legend.position="top") 
+```
+
+```{r}
+ggplot(aes(x=NDAI, color=as.character(exlabel)), data=file2) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image2")
+ggplot(aes(x=SD, color=as.character(exlabel)), data=file2) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image2") + xlim(0, 10)+
+  theme(legend.position="top") 
+ggplot(aes(x=CORR, color=as.character(exlabel)), data=file2) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image2") + xlim(0, 0.3)+
+  theme(legend.position="top") 
+```
+
+```{r}
+ggplot(aes(x=NDAI, color=as.character(exlabel)), data=file3) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image3")
+ggplot(aes(x=SD, color=as.character(exlabel)), data=file3) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image3") + xlim(0, 10)+
+  theme(legend.position="top") 
+ggplot(aes(x=CORR, color=as.character(exlabel)), data=file3) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label", caption = "Image3") + xlim(0, 0.3)+
+  theme(legend.position="top") 
+```
+
+# Data Split and EDA
+## Part a Split data
+If need to remove the 0-labelled (no label) rows:
+```{r}
+file1_no0 = file1[which(file1$exlabel != 0),]
+file2_no0 = file2[which(file2$exlabel != 0),]
+file3_no0 = file3[which(file3$exlabel != 0),]
+whole_withna = rbind(file1_no0, file2_no0, file3_no0)
+```
+
+Split into three sets: train, validate (20% of train) and test (25% of whole data)
+Method 1: by splitting x- and y- coordinates into 100 parts and select randomly.
+```{r}
+whole = whole_withna[complete.cases(whole_withna),]
+secs = 40
+blocks = (secs+1)^2
+rangey = range(whole$y, na.rm = TRUE)
+rangex = range(whole$x, na.rm = TRUE)
+diffx = (rangex[2]-rangex[1])/secs
+diffy = (rangey[2]-rangey[1])/secs
+whole$sepx = floor(whole$x/diffx)
+whole$sepx = whole$sepx-min(whole$sepx, na.rm = TRUE)+1
+whole$sepy = floor(whole$y/diffy)
+whole$sepy = (whole$sepy-min(whole$sepy, na.rm = TRUE))*(secs+1)
+whole$num = whole$sepx+whole$sepy
+blocks_num = split(whole, whole$num)
+rate = 0.25+0.75*0.2
+max_lis = max(whole$num, na.rm=TRUE)
+min_lis = min(whole$num, na.rm=TRUE)
+Index1 = sample(max_lis-min_lis+1, size = floor(blocks*rate))
+testIndex1 = Index1[1:(length(Index1)*5/8)]
+valIndex1 = Index1[(length(Index1)*5/8+1):length(Index1)]
+train_set1 = whole[!(whole$num %in% Index1),]
+test_set1 = whole[whole$num %in% testIndex1,]
+val_set1 = whole[whole$num %in% valIndex1,]
+```
+
+Method 2: split group -1 and 1 to extract 25% data randomly from each section. This will remove missing data in the label column. We further put 20% of the training set data as validation set.
+```{r}
+train_set2 = file1_no0[complete.cases(file1_no0),]
+test_set2 = file2_no0[complete.cases(file2_no0),]
+val_set2 = file3_no0[complete.cases(file3_no0),]
+```
+
+
+## Part b Baseline
+```{r}
+baseline1val = rep(-1, nrow(val_set1))
+baseline1test = rep(-1, nrow(test_set1))
+baseline2val = rep(-1, nrow(val_set2))
+baseline2test = rep(-1, nrow(test_set2))
+accuracy1val = mean(baseline1val == val_set1$exlabel) 
+accuracy1test = mean(baseline1test == test_set1$exlabel)
+accuracy2val = mean(baseline2val == val_set2$exlabel)
+accuracy2test = mean(baseline2test == test_set2$exlabel)
+```
+Around 29-30%
+
+## Part c First Order Importance
+Density Plots
+```{r}
+ggplot(aes(x=NDAI, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label") +
+  theme(legend.position="top") 
+ggplot(aes(x=SD, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label") + xlim(0, 10) +
+  theme(legend.position="top") 
+ggplot(aes(x=CORR, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label") + xlim(0, 0.25) +
+  theme(legend.position="top") 
+```
+
+```{r}
+ggplot(aes(x=DF, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label")
+ggplot(aes(x=CF, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label")
+ggplot(aes(x=BF, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label")
+ggplot(aes(x=AF, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label")
+ggplot(aes(x=AN, color=as.character(exlabel)), data=whole) +
+  geom_density(alpha=0.5) + labs(colour="Expert Label")
+```
+
+Principal Component Analysis
+```{r}
+library(FactoMineR)
+library(factoextra)
+library(ggplot2)
+library(devtools)
+library(ggbiplot)
+full_data_no0 = full_data[which(full_data$exlabel !=0),]
+whole.pca <- prcomp(full_data_no0[, -c(1,2,3)], center = TRUE, scale. = TRUE)
+whole_pca = PCA(full_data_no0[, -c(1,2,3)], graph=F)
+evalues = whole_pca$eig
+fviz_screeplot(whole_pca, ncp=11)
+ggbiplot(whole.pca,ellipse=TRUE, groups=as.character(full_data_no0$exlabel), alpha=0,
+         obs.scale = 1, var.scale = 1)+
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top') + xlim(-4, 5.5) + ylim(-2, 3)
+```
+
+Therefore we pick NDAI, SD and CORR as the most important three features.
+
+## Part d Generic CV function
+```{r}
+library(caret)
+classification_acc = function(fitted, actual) {
+  return(mean(fitted!=actual))
+}
+genericCV = function(classifier, features, labels, K, loss_func=classification_acc) {
+  set.seed(1)
+  folds <- createFolds(labels, k = K)
+  CVerrors = data.frame(matrix(ncol = 0, nrow = 1))
+  for (i in 1:K) {
+    fold_index = folds[[paste("Fold", i, sep="")]]
+    cv = features[fold_index, ]
+    train_set = features[-fold_index, ]
+    predicted = classifier(cv)
+    pe_index = paste("Fold", i, sep="")
+    CVerrors[pe_index] = loss_func(predicted, labels)
+  }
+  return(CVerrors)
+}
+```
+
+# Modelling
+```{r}
+library(ggplot2)
+library(kknn)
+library(class)
+library(ROCR)
+library(pROC)
+library(plotROC)
+library(ISLR)
+library(MASS)
+library(randomForest)
+#emerge training and val
+train1 <- rbind(train_set1,val_set1)
+test1 <- rbind(test_set1)
+train2 <- rbind(train_set2,val_set2)
+test2 <- rbind(test_set2)
+#create cv 
+library(caret)
+set.seed(123)
+folds1 <- createFolds(train1$exlabel,k=5)
+folds2 <- createFolds(train2$exlabel,k=5)
+```
+
+## KNN
+Split 1
+```{r}
+cverror1 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds1[[paste("Fold",i,sep="")]]
+  cv = train1[index,]
+  train = train1[-c(index),]
+  class <- knn(train[,4:6],
+               cv[,4:6],cl=train[,3])
+  error = mean(class!=cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  cverror1[error_index] = error
+}
+cverror1
+
+class1 <- knn(train1[,4:6],           
+             test1[,4:6],cl=train1[,3],k=10,prob="TRUE")
+table(test1$exlabel,class1)
+mean(class1 != test1$exlabel)
+```
+Split 2
+```{r}
+cverror2 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds2[[paste("Fold",i,sep="")]]
+  cv = train2[index,]
+  train = train2[-c(index),]
+  class <- knn(train[,4:6],
+               cv[,4:6],cl=train[,3])
+  error = mean(class!=cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  cverror2[error_index] = error
+}
+cverror2
+
+class2 <- knn(train2[,4:6],           
+              test2[,4:6],cl=train2[,3],prob="TRUE")
+table(test2$exlabel,class2)
+mean(class2 != test2$exlabel)
+```
+
+### ROC
+```{r}
+prob1 <- attr(class1,"prob")
+prob1 <- 2*ifelse(class1=="-1",1-prob1,prob1)-1
+pred1 <- prediction(prob1,test1$exlabel)
+perf1 <- performance(pred1,"tpr","fpr")
+
+
+
+rocr_sensspec <- function(x, class) {
+  pred <- prediction(x, class)
+  perf <- performance(pred, "sens", "spec")
+  sens <- slot(perf, "y.values")[[1]]
+  spec <- slot(perf, "x.values")[[1]]
+  cut <- slot(perf, "alpha.values")[[1]]
+  cut[which.max(sens + spec)]
+}
+rocr_sensspec(prob1,test1$exlabel)
+
+
+auc1 <- performance(pred1,'auc')
+auc1 <- unlist(slot(auc1,"y.values"))
+auc1
+```
+
+
+## Logistic Regression
+Modify the model
+```{r}
+#model
+train1$exlabel[train1$exlabel==-1] <- 0
+train2$exlabel[train2$exlabel==-1] <- 0
+test1$exlabel[test1$exlabel==-1] <- 0
+test2$exlabel[test2$exlabel==-1] <- 0
+```
+Split 1
+```{r}
+lrerror1 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds1[[paste("Fold",i,sep="")]]
+  cv = train1[index,]
+  train = train1[-c(index),]
+  fit <- glm(exlabel~ NDAI+SD+CORR, family = "binomial",
+               data=train)
+  pre <- predict(fit,cv,type="response")
+  lrpre <- ifelse(pre>0.5,"1","0")
+  error <- mean(lrpre != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  lrerror1[error_index] = error
+}
+lrerror1
+
+glm.fit1 <- glm(exlabel~ NDAI+SD+CORR, family = "binomial",
+                data=train1)
+pre1 <- predict(glm.fit1,newdata=test1,type="response")
+lr_pre1 <- ifelse(pre1>0.5,1,0)
+table(lr_pre1,test1$exlabel)
+mean(lr_pre1 != test1$exlabel)
+```
+Split 2
+```{r}
+lrerror2 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds2[[paste("Fold",i,sep="")]]
+  cv = train2[index,]
+  train = train2[-c(index),]
+  fit <- glm(exlabel~ NDAI+SD+CORR, family = "binomial",
+             data=train)
+  pre <- predict(fit,cv,type="response")
+  lrpre <- ifelse(pre>0.5,"1","0")
+  error <- mean(lrpre != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  lrerror2[error_index] = error
+}
+lrerror2
+
+glm.fit2 <- glm(exlabel~ NDAI+SD+CORR, family = "binomial",
+                data=train2)
+pre2 <- predict(glm.fit2,newdata=test2,type=c("response"))
+lr_pre2 <- ifelse(pre2>0.5,1,0)
+table(lr_pre2,test2$exlabel)
+mean(lr_pre2 != test2$exlabel)
+```
+### ROC
+```{r}
+pred2 <- prediction(pre1,test1$exlabel)
+perf2 <- performance(pred2,"tpr","fpr")
+
+
+rocr_sensspec(pre1,test1$exlabel)
+
+auc2 <- performance(pred2,'auc')
+auc2 <- unlist(slot(auc2,"y.values"))
+auc2
+```
+
+
+## LDA
+Check for Gaussian distribution of data
+```{r}
+#assumption
+par(mfrow=c(1,3))
+for(i in 4:6){
+  hist(train1[,i],main=names(train1)[i])
+}
+#most shows a Gaussian distribution.
+par(mfrow=c(1,3))
+for(i in 4:6){
+  boxplot(train1[,i],main=names(train1)[i])
+}
+```
+Split 1
+```{r}
+train1$exlabel[train1$exlabel==0] <- -1
+train2$exlabel[train2$exlabel==0] <- -1
+test1$exlabel[test1$exlabel==0] <- -1
+test2$exlabel[test2$exlabel==0] <- -1
+ldaerror1 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds1[[paste("Fold",i,sep="")]]
+  cv = train1[index,]
+  train = train1[-c(index),]
+  fit <- lda(exlabel~ NDAI+SD+CORR, data=train)
+  pre <- predict(fit,cv)
+  error <- mean(pre$class != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  ldaerror1[error_index] = error
+}
+ldaerror1
+
+ldafit1 <- lda(exlabel~ NDAI+SD+CORR, data=train1)
+ldapre1 <- predict(ldafit1,test1)
+table(ldapre1$class,test1$exlabel)
+mean(ldapre1$class != test1$exlabel)
+```
+Split 2
+```{r}
+ldaerror2 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds2[[paste("Fold",i,sep="")]]
+  cv = train2[index,]
+  train = train2[-c(index),]
+  fit <- lda(exlabel~ NDAI+SD+CORR, data=train)
+  pre <- predict(fit,cv)
+  error <- mean(pre$class != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  ldaerror2[error_index] = error
+}
+ldaerror2
+
+ldafit2 <- lda(exlabel~ NDAI+SD+CORR, data=train2)
+ldapre2 <- predict(ldafit2,test2)
+table(ldapre2$class,test2$exlabel)
+mean(ldapre2$class != test2$exlabel)
+```
+### ROC
+```{r}
+#curve
+pred3 <- prediction(ldapre1$posterior[,2],test1$exlabel)
+perf3 <- performance(pred3,"tpr","fpr")
+
+rocr_sensspec(ldapre1$posterior[,2],test1$exlabel)
+
+
+auc3 <- performance(pred3,'auc')
+auc3 <- unlist(slot(auc3,"y.values"))
+auc3
+```
+
+
+## QDA
+Split 1
+```{r}
+qdaerror1 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds1[[paste("Fold",i,sep="")]]
+  cv = train1[index,]
+  train = train1[-c(index),]
+  fit <- qda(exlabel~ NDAI+SD+CORR, data=train)
+  pre <- predict(fit,cv)
+  error <- mean(pre$class != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  qdaerror1[error_index] = error
+}
+qdaerror1
+
+qdafit1 <- qda(exlabel~ NDAI+SD+CORR, data=train1)
+qdapre1 <- predict(qdafit1,test1)
+table(qdapre1$class,test1$exlabel)
+mean(qdapre1$class != test1$exlabel)
+```
+Split 2
+```{r}
+qdaerror2 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds2[[paste("Fold",i,sep="")]]
+  cv = train2[index,]
+  train = train2[-c(index),]
+  fit <- qda(exlabel~ NDAI+SD+CORR, data=train)
+  pre <- predict(fit,cv)
+  error <- mean(pre$class != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  qdaerror2[error_index] = error
+}
+qdaerror2
+
+qdafit2 <- qda(exlabel~ NDAI+SD+CORR, data=train2)
+qdapre2 <- predict(qdafit2,test2)
+table(qdapre2$class,test2$exlabel)
+mean(qdapre2$class != test2$exlabel)
+```
+### ROC
+```{r}
+#curve
+pred4 <- prediction(qdapre1$posterior[,2],test1$exlabel)
+perf4 <- performance(pred4,"tpr","fpr")
+
+
+rocr_sensspec(qdapre1$posterior[,2],test1$exlabel)
+#0.1536
+
+auc4 <- performance(pred4,'auc')
+auc4 <- unlist(slot(auc4,"y.values"))
+auc4
+```
+
+
+## Random Forest
+Split 1
+```{r}
+#split1
+rferror1 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds1[[paste("Fold",i,sep="")]]
+  cv = train1[index,]
+  train = train1[-c(index),]
+  fit <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train,
+                      importance=TRUE)
+  pre <- predict(fit,cv,type = "class")
+  error <- mean(pre != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  rferror1[error_index] = error
+}
+rferror1
+
+rffit1 <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train1,
+                       importance=TRUE)
+rffit1$confusion
+rfpre1 <- predict(rffit1,test1,type="class")
+table(rfpre1,test1$exlabel)
+mean(rfpre1 != test1$exlabel)
+```
+Split 2
+```{r}
+rferror2 <- data.frame(matrix(ncol=0,nrow=1))
+for(i in 1:5){
+  index = folds2[[paste("Fold",i,sep="")]]
+  cv = train2[index,]
+  train = train2[-c(index),]
+  fit <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train,
+                      importance=TRUE)
+  pre <- predict(fit,cv,type = "class")
+  error <- mean(pre != cv$exlabel)
+  error_index <- paste("error",i, sep="")
+  rferror2[error_index] = error
+}
+rferror2
+
+rffit2 <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train2,
+                       importance=TRUE)
+rffit2$confusion
+rfpre2 <- predict(rffit2,test2,type="class")
+table(rfpre2,test2$exlabel)
+mean(rfpre2 != test2$exlabel)
+```
+### ROC
+```{r}
+prerandom <- predict(rffit1,test1,type="prob")
+pred5 <- prediction(prerandom[,2],test1$exlabel)
+perf5 <- performance(pred5,"tpr","fpr")
+
+rocr_sensspec(rfpre1,test1$exlabel)
+auc5 <- performance(pred5,'auc')
+auc5 <- unlist(slot(auc5,"y.values"))
+auc5
+```
+## Combined ROC and AUC
+```{r}
+par(mfrow=c(2,3))
+plot(perf1)+title("ROC for KNN")
+abline(v=0.09,col="red",lty=2)
+plot(perf2)+title("ROC for Logistic")
+abline(v=0.1124,col="red",lty=2)
+plot(perf3)+title("ROC for LDA")
+abline(v=0.1059,col="red",lty=2)
+plot(perf4)+title("ROC for QDA")
+abline(v=0.1123,col="red",lty=2)
+plot(perf5)+title("ROC for random forest")
+abline(v=0.0817,col="red",lty=2)
+
+
+ 
+plot(perf1,col="red",lwd=2)+title("ROC curve")
+plot(perf2,col="blue",add=TRUE,lwd=2)
+plot(perf3,col="green",add=TRUE,lwd=2)
+plot(perf4,col="purple",add=TRUE,lwd=2)
+plot(perf5,col="dark green",add=TRUE, lwd=2)
+abline(0,1)
+legend("bottomright", legend=c("KNN","Logistic","LDA","QDA","Random Forest"),
+       pch=19,col=c("red","blue","green","purple","dark green"),
+       cex=0.8,pt.cex=0.8)
+```
+
+# Diagnosis
+## Change of hyperparameter in KNN
+Visualization
+```{r}
+ggplot(data = whole_withna, aes(x, y, color = as.character(whole_withna$exlabel))) +
+  geom_point() +
+  labs(x="x coordinate", y="y coordinate", colour="Expert Label", caption="Image") + 
+  scale_color_brewer(palette = "Pastel2") +
+  theme(legend.position="top")
+```
+Test error with different k
+```{r}
+correct0 <- rep(0,30)
+for(i in 1:30){
+  class <- knn(train1[,4:6],
+               test1[,4:6],cl=train1[,3],k=i)
+  correct0[i] <-  mean(class!= test1$exlabel)
+}
+correct0
+plot(correct0,xlab="k value",ylab="error")
+```
+## Misclassification in KNN
+```{r}
+diff <- test1$exlabel
+for(i in 1:37140){
+  if(test1$exlabel[i]==class1[i])
+    diff[i]=diff[i]
+  else{
+    diff[i]="wrong class"
+  }
+}
+pca6 <- prcomp(test1[,4:6],scale. = TRUE)
+matrix6 <- pca6$rotation
+pcs6 <- as.matrix(test1[,4:6]) %*% matrix6
+pc16 <- as.data.frame(pcs6[,1:2])
+ggplot(pc16,aes(x=PC1,y=PC2,
+                colour=diff))+
+  geom_text(aes(label=
+                  test1[,3]),size=4)
+```
+Compared with that from random forest.
+```{r}
+train3 <- rbind()
+diffr <- test1$exlabel
+for(i in 1:37140){
+  if(test1$exlabel[i]==rfpre1[i])
+    diffr[i]=diffr[i]
+  else{
+    if(diffr[i]==1)
+    diffr[i]="wrong to -1"
+    else{
+      diffr[i]="wrong to 1"
+    }
+    }
+  }
+
+ggplot(pc16,aes(x=PC1,y=PC2,
+                colour=diffr))+
+  geom_text(aes(label=
+                  test1[,3]),size=4)
+```
+The magnitudes and plots
+```{r}
+mistest <- cbind(test1,diffr)
+wrong <- mistest[which(mistest$diffr=="wrong to -1"),]
+par(mfrow=c(1,3))
+for(i in 4:6){
+  hist(wrong[,i],main=names(wrong)[i])
+}
+par(mfrow=c(1,3))
+for(i in 4:6){
+  boxplot(wrong[,i],main=names(wrong)[i])
+}
+
+
+ggplot(data = mistest, aes(x, y, color = as.character(diffr))) +
+  geom_point() +
+  labs(x="x coordinate", y="y coordinate", colour="Expert Label", caption="Image 1") + 
+  scale_color_brewer(palette = "Pastel2") +
+  theme(legend.position="top")
+```
+
+## Better Classifier
+### Removing the long tail
+```{r}
+#step1
+lab1 = test1[which(test1$exlabel==1),]
+lab0 = test1[which(test1$exlabel==-1),]
+par(mfrow=c(1,3))
+for(i in 4:6){
+  hist(lab1[,i],main=names(wrong)[i])
+}
+#most shows a Gaussian distribution.
+par(mfrow=c(1,3))
+for(i in 4:6){
+  boxplot(lab1[,i],main=names(wrong)[i])
+}
+par(mfrow=c(1,3))
+for(i in 4:6){
+  hist(lab0[,i],main=names(wrong)[i])
+}
+#most shows a Gaussian distribution.
+par(mfrow=c(1,3))
+for(i in 4:6){
+  boxplot(lab0[,i],main=names(wrong)[i])
+}
+
+#step 2
+all <- cbind(test1, pc16)
+notail <- all[which(all$PC1>-15),]
+
+
+rfpre0 <- predict(rffit1,notail,type="class")
+table(rfpre0,notail$exlabel)
+mean(rfpre0 != notail$exlabel)
+
+diffr0 <- notail$exlabel
+for(i in 1:39455){
+  if(diffr0[i]==rfpre0[i])
+    diffr0[i]=diffr0[i]
+  else{
+    if(diffr0[i]==1)
+      diffr0[i]="wrong to 1"
+    else{
+      diffr0[i]="wrong to -1"
+    }
+  }
+}
+
+ggplot(notail,aes(x=PC1,y=PC2,
+                colour=diffr0))+
+  geom_text(aes(label=
+                  notail[,3]),size=4)
+```
+
+### Support Vector Machine
+We will be using a smaller sample of Image 1
+```{r}
+set.seed(1)
+train_tiny=rbind(train_set2, val_set2)
+n_tr = nrow(rbind(train_set2, val_set2))
+n_te = nrow(test_set2)
+separate_blocks = function(secs, data_set) {
+  blocks = (secs+1)^2
+  rangey = range(data_set$y, na.rm = TRUE)
+  rangex = range(data_set$x, na.rm = TRUE)
+  diffx = (rangex[2]-rangex[1])/secs
+  diffy = (rangey[2]-rangey[1])/secs
+  data_set$sepx = floor(data_set$x/diffx)
+  data_set$sepx = data_set$sepx-min(data_set$sepx, na.rm = TRUE)+1
+  data_set$sepy = floor(data_set$y/diffy)
+  data_set$sepy = (data_set$sepy-min(data_set$sepy, na.rm = TRUE))*(secs+1)
+  data_set$num = data_set$sepx+data_set$sepy
+  rate = 0.95
+  max_lis = max(data_set$num, na.rm=TRUE)
+  min_lis = min(data_set$num, na.rm=TRUE)
+  Index = sample(max_lis-min_lis+1, size = floor(blocks*rate))
+  return (data_set[!(data_set$num %in% Index),])
+}
+train_tiny = separate_blocks(40, train_tiny)
+test_tiny = separate_blocks(40, test_set2)
+```
+
+```{r}
+library(e1071)
+fit = svm(factor(exlabel) ~ CORR+NDAI+SD, data = train_tiny, scale = FALSE, kernel = "radial", cost = 5)
+pred_y = predict(fit, test_tiny)
+mean(pred_y!=test_tiny$exlabel)
+```
+
+## Split 2 different ways of file 1 as test
+```{r}
+train_set3 = test_set2
+test_set3 = train_set2
+val_set3 = val_set2
+train3 <- rbind(train_set3,val_set3)
+test3 <- test_set3
+rffit3 <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train3,
+                       importance=TRUE)
+rffit3$confusion
+rfpre3 <- predict(rffit3,test3,type="class")
+table(rfpre3,test3$exlabel)
+mean(rfpre3 != test3$exlabel)
+
+train4 <- rbind(train_set3,test_set3)
+test4 <- val_set3
+rffit4 <- randomForest(factor(exlabel)~NDAI+SD+CORR,data=train4,
+                       importance=TRUE)
+rffit4$confusion
+rfpre4 <- predict(rffit4,test4,type="class")
+table(rfpre4,test4$exlabel)
+mean(rfpre4 != test4$exlabel)
+```
